@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RealtyVision — оцінка житла</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="app">
+
+    <header class="topbar">
+        <div class="container topbar__inner">
+            <div class="brand">
+                <img src="/static/img/logo.svg" width="28" height="28" alt="">
+                RealtyVision
+            </div>
+            <nav class="topbar__nav">
+                <a class="nav-link" :class="{active: currentPage==='evaluate'}" @click="currentPage='evaluate'">Оцінка</a>
+                <a class="nav-link" :class="{active: currentPage==='history'}" @click="goHistory">Історія</a>
+            </nav>
+            <div class="mode-badge" :class="'mode-' + currentMode">{{ modeLabel }}</div>
+        </div>
+    </header>
+
+    <main class="container main-content">
+
+        <!-- Сторінка оцінки -->
+        <section v-if="currentPage==='evaluate'" class="page-evaluate">
+            <div class="two-col">
+
+                <!-- Ліва колонка: форма -->
+                <div class="col-form">
+                    <h2 class="section-title">Параметри об'єкта</h2>
+
+                    <!-- Завантаження фото -->
+                    <div class="upload-zone"
+                         :class="{dragging: isDragging}"
+                         @dragover.prevent="isDragging=true"
+                         @dragleave="isDragging=false"
+                         @drop.prevent="onDrop"
+                         @click="$refs.fileInput.click()">
+                        <div v-if="form.photos.length === 0" class="upload-placeholder">
+                            <div class="upload-icon">&#8679;</div>
+                            <div>Перетягніть фото або натисніть для вибору</div>
+                            <div class="upload-hint">JPG, PNG, WebP · до 8 МБ · від 1 до 10 фото</div>
+                        </div>
+                        <div v-else class="photo-grid">
+                            <div v-for="(preview, idx) in form.photoPreviews" :key="idx" class="photo-thumb">
+                                <img :src="preview" alt="фото">
+                                <button class="photo-remove" @click.stop="removePhoto(idx)">&#10005;</button>
+                            </div>
+                            <div v-if="form.photos.length < 10" class="photo-add" @click.stop="$refs.fileInput.click()">+</div>
+                        </div>
+                    </div>
+                    <input ref="fileInput" type="file" accept=".jpg,.jpeg,.png,.webp" multiple style="display:none" @change="onFileSelect">
+
+                    <!-- Тип нерухомості -->
+                    <div class="field">
+                        <label>Тип нерухомості</label>
+                        <div class="type-toggle">
+                            <button type="button"
+                                    :class="{active: form.realtyType==='apartment'}"
+                                    @click="form.realtyType='apartment'">
+                                Квартира
+                            </button>
+                            <button type="button"
+                                    :class="{active: form.realtyType==='house'}"
+                                    @click="form.realtyType='house'">
+                                Будинок
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Область та місто -->
+                    <div class="field">
+                        <label>Область</label>
+                        <select v-model="form.stateId" @change="loadCities">
+                            <option :value="null" disabled>Оберіть область</option>
+                            <option v-for="r in regions" :key="r.state_id" :value="r.state_id">{{ r.name }}</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Місто</label>
+                        <select v-model="form.cityId" :disabled="!form.stateId || form.cities.length===0">
+                            <option :value="null" disabled>Оберіть місто</option>
+                            <option v-for="c in form.cities" :key="c.city_id" :value="c.city_id">{{ c.name }}</option>
+                        </select>
+                    </div>
+
+                    <!-- Кімнати -->
+                    <div class="field">
+                        <label>Кількість кімнат</label>
+                        <div class="rooms-toggle">
+                            <button type="button" v-for="n in [1,2,3,4,5]" :key="n"
+                                    :class="{active: form.roomsCount===n}"
+                                    @click="form.roomsCount=n">{{ n }}</button>
+                            <button type="button"
+                                    :class="{active: form.roomsCount===6}"
+                                    @click="form.roomsCount=6">6+</button>
+                        </div>
+                    </div>
+
+                    <!-- Поверх (тільки для квартири) -->
+                    <div v-if="form.realtyType==='apartment'" class="field-row-2">
+                        <div class="field">
+                            <label>Поверх</label>
+                            <input type="number" v-model.number="form.floor" min="1" max="50" placeholder="напр. 4">
+                        </div>
+                        <div class="field">
+                            <label>Поверхів у будинку</label>
+                            <input type="number" v-model.number="form.totalFloors" min="1" max="50" placeholder="напр. 9">
+                        </div>
+                    </div>
+
+                    <!-- Рік та площа -->
+                    <div class="field-row-2">
+                        <div class="field">
+                            <label>Рік побудови</label>
+                            <input type="number" v-model.number="form.yearBuilt" min="1900" :max="currentYear" placeholder="необов'язково">
+                        </div>
+                        <div class="field">
+                            <label>Площа, м²</label>
+                            <input type="number" v-model.number="form.userArea" min="10" max="1000" step="0.5" placeholder="оцінимо за фото">
+                        </div>
+                    </div>
+
+                    <!-- Опис -->
+                    <div class="field">
+                        <label>Додатковий опис <span class="label-hint">(необов'язково)</span></label>
+                        <textarea v-model="form.userDescription" rows="3" placeholder="Стан ремонту, особливості, що не видно на фото..."></textarea>
+                    </div>
+
+                    <button class="btn-primary" :disabled="isLoading || !canSubmit" @click="submitEvaluation">
+                        <span v-if="isLoading">Аналіз...</span>
+                        <span v-else>Оцінити</span>
+                    </button>
+                </div>
+
+                <!-- Права колонка: результат -->
+                <div class="col-result">
+                    <!-- Placeholder -->
+                    <div v-if="!isLoading && !evaluation && !evalError" class="result-placeholder">
+                        <div class="placeholder-icon">&#9776;</div>
+                        <p>Заповніть форму та натисніть «Оцінити»</p>
+                    </div>
+
+                    <!-- Лоадер -->
+                    <div v-if="isLoading" class="result-loading">
+                        <div class="loading-steps">
+                            <div v-for="step in loadingSteps" :key="step.id"
+                                 class="loading-step"
+                                 :class="{done: step.done, active: step.active && !step.done}">
+                                <span class="step-icon">
+                                    <span v-if="step.done">&#10003;</span>
+                                    <span v-else-if="step.active" class="spinner"></span>
+                                    <span v-else>&#9675;</span>
+                                </span>
+                                <span>{{ step.label }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Помилка -->
+                    <div v-if="evalError" class="result-error">
+                        <strong>Помилка:</strong> {{ evalError }}
+                    </div>
+
+                    <!-- Результат -->
+                    <div v-if="evaluation && !isLoading" class="result-card">
+
+                        <div v-if="evaluation.mode !== 'full'" class="mode-warning">
+
+                            <span v-if="evaluation.mode==='full_with_cached_prices'">Ціни з кешу</span>
+                            <span v-else-if="evaluation.mode==='degraded'">AI обмежений (локальна модель)</span>
+                            <span v-else>Без AI, оцінка тільки за характеристиками</span>
+                        </div>
+
+                        <div class="price-block">
+                            <div class="price-label">Орієнтовна вартість</div>
+                            <div class="price-main">${{ formatNum(evaluation.final_price) }}</div>
+                            <div class="price-range">діапазон: ${{ formatNum(evaluation.price_min) }} – ${{ formatNum(evaluation.price_max) }}</div>
+                        </div>
+
+                        <div class="result-card-body">
+                            <div class="meta-row">
+                                <div class="meta-cell">
+                                    <div class="meta-title">Стан</div>
+                                    <div class="condition-stars">
+                                        <span v-for="i in 5" :key="i" class="star" :class="{filled: i <= evaluation.condition_score}">&#9679;</span>
+                                    </div>
+                                    <div class="meta-value">{{ evaluation.condition_label }}</div>
+                                </div>
+                                <div class="meta-cell">
+                                    <div class="meta-title">Площа</div>
+                                    <div class="meta-value big">{{ evaluation.final_area }} м²</div>
+                                    <div class="meta-sub">{{ evaluation.area_source === 'user' ? 'вказана' : 'оцінена за фото' }}</div>
+                                </div>
+                            </div>
+
+                            <div class="base-price-row">
+                                Базова ціна: <strong>${{ formatNum(evaluation.base_price_per_m2) }}/м²</strong>
+                                <span class="source-tag">{{ sourceName(evaluation.price_source) }}
+                                    <template v-if="evaluation.price_sample_size > 0">, {{ evaluation.price_sample_size }} аналогів</template>
+                                </span>
+                            </div>
+
+                            <div class="coefficients-block">
+                                <div class="coef-title">Коригування</div>
+                                <div class="coef-row">
+                                    <span>Стан</span>
+                                    <span :class="coefClass(evaluation.coefficients.condition)">×{{ evaluation.coefficients.condition }}</span>
+                                </div>
+                                <div class="coef-row">
+                                    <span>Поверх</span>
+                                    <span :class="coefClass(evaluation.coefficients.floor)">×{{ evaluation.coefficients.floor }}</span>
+                                </div>
+                                <div class="coef-row">
+                                    <span>Рік побудови{{ evaluation.year_built ? ' (' + evaluation.year_built + ')' : '' }}</span>
+                                    <span :class="coefClass(evaluation.coefficients.year)">×{{ evaluation.coefficients.year }}</span>
+                                </div>
+                                <div class="coef-row coef-total">
+                                    <span>Підсумок</span>
+                                    <span :class="coefClass(evaluation.coefficients.combined)">×{{ evaluation.coefficients.combined }}</span>
+                                </div>
+                            </div>
+
+                            <div v-if="evaluation.factors && evaluation.factors.length > 0" class="factors-block">
+                                <div class="factors-title">Помічено на фото</div>
+                                <div v-for="f in evaluation.factors" :key="f.text"
+                                     class="factor-item"
+                                     :class="'factor-' + f.type">
+                                    <span class="factor-sign">{{ f.type === 'positive' ? '+' : f.type === 'negative' ? '−' : '·' }}</span>
+                                    {{ f.text }}
+                                </div>
+                            </div>
+
+                            <div v-if="evaluation.explanation" class="explanation-block">
+                                <div class="explanation-title">Пояснення</div>
+                                <div class="explanation-text">{{ evaluation.explanation }}</div>
+                            </div>
+                        </div>
+
+                        <div class="result-actions">
+                            <button class="btn-secondary" @click="resetEvaluation">Нова оцінка</button>
+                            <button class="btn-primary" :disabled="isSaved" @click="saveEvaluation">
+                                {{ isSaved ? 'Збережено' : 'Зберегти в історію' }}
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Сторінка історії -->
+        <section v-if="currentPage==='history'" class="page-history">
+            <h2 class="section-title">Історія оцінок</h2>
+
+            <div v-if="historyLoading" class="loading-inline">Завантаження...</div>
+            <div v-else-if="history.length === 0" class="empty-state">
+                <p>Збережених оцінок немає.</p>
+                <button class="btn-secondary" @click="currentPage='evaluate'">Перейти до оцінки</button>
+            </div>
+            <div v-else class="history-list">
+                <div v-for="item in history" :key="item.id" class="history-card" @click="openHistoryItem(item.id)">
+                    <div class="history-thumb">
+                        <img v-if="item.thumbnail" :src="item.thumbnail" alt="фото">
+                        <div v-else class="thumb-placeholder">&#9776;</div>
+                    </div>
+                    <div class="history-info">
+                        <div class="history-title">{{ item.city_name }}, {{ item.rooms_count }}-кімн. {{ item.realty_type === 'apartment' ? 'квартира' : 'будинок' }}</div>
+                        <div class="history-price">${{ formatNum(item.final_price) }} · {{ item.condition_label }}</div>
+                        <div class="history-date">{{ formatDate(item.created_at) }}</div>
+                    </div>
+                    <button class="history-delete" @click.stop="deleteHistoryItem(item.id)" title="Видалити">&#10005;</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <div class="container footer__inner">
+            Дані про ціни: <a href="https://dom.ria.com" target="_blank" rel="noopener">DIM.RIA</a>
+            &nbsp;·&nbsp; Курсова робота, {{ currentYear }}
+        </div>
+    </footer>
+
+    <!-- Модалка деталей з історії -->
+    <div v-if="selectedItem" class="modal-overlay" @click.self="selectedItem=null">
+        <div class="modal">
+            <button class="modal-close" @click="selectedItem=null">&#10005;</button>
+            <h3 class="modal-title">{{ selectedItem.city_name }}, {{ selectedItem.rooms_count }}-кімн. {{ selectedItem.realty_type === 'apartment' ? 'квартира' : 'будинок' }}</h3>
+
+            <div v-if="selectedItem.photos && selectedItem.photos.length" class="modal-gallery">
+                <img v-for="p in selectedItem.photos" :key="p.filename" :src="p.url" class="gallery-img" alt="фото">
+            </div>
+
+            <div class="price-block">
+                <div class="price-label">Орієнтовна вартість</div>
+                <div class="price-main">${{ formatNum(selectedItem.final_price) }}</div>
+                <div class="price-range">${{ formatNum(selectedItem.price_min) }} – ${{ formatNum(selectedItem.price_max) }}</div>
+            </div>
+
+            <div class="meta-row">
+                <div class="meta-cell">
+                    <div class="meta-title">Стан</div>
+                    <div class="meta-value">{{ selectedItem.condition_label }}</div>
+                </div>
+                <div class="meta-cell">
+                    <div class="meta-title">Площа</div>
+                    <div class="meta-value">{{ selectedItem.final_area }} м²</div>
+                </div>
+            </div>
+
+            <div v-if="selectedItem.explanation" class="explanation-block">
+                <div class="explanation-title">Пояснення</div>
+                <div class="explanation-text">{{ selectedItem.explanation }}</div>
+            </div>
+
+            <div class="modal-date">{{ formatDate(selectedItem.created_at) }}</div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

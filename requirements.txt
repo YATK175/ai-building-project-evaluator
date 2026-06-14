@@ -1,0 +1,8 @@
+flask==3.0.3
+httpx==0.27.2
+python-dotenv==1.0.1
+Pillow==10.4.0
+
+# Опціонально — офлайн vision-фолбек (потребує ~600 МБ та 2 ГБ RAM):
+# transformers==4.45.2
+# torch==2.4.1

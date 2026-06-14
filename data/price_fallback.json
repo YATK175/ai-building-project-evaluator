@@ -1,0 +1,46 @@
+{
+  "updated_at": "2026-05-01",
+  "default_per_state": {
+    "1":  {"apartment": 780,  "house": 550},
+    "2":  {"apartment": 750,  "house": 520},
+    "3":  {"apartment": 750,  "house": 540},
+    "4":  {"apartment": 500,  "house": 380},
+    "5":  {"apartment": 620,  "house": 440},
+    "6":  {"apartment": 880,  "house": 600},
+    "7":  {"apartment": 600,  "house": 430},
+    "8":  {"apartment": 880,  "house": 600},
+    "9":  {"apartment": 1800, "house": 1200},
+    "10": {"apartment": 1400, "house": 950},
+    "11": {"apartment": 560,  "house": 400},
+    "12": {"apartment": 350,  "house": 250},
+    "13": {"apartment": 1150, "house": 800},
+    "14": {"apartment": 640,  "house": 460},
+    "15": {"apartment": 980,  "house": 680},
+    "16": {"apartment": 650,  "house": 460},
+    "17": {"apartment": 700,  "house": 500},
+    "18": {"apartment": 700,  "house": 500},
+    "19": {"apartment": 680,  "house": 480},
+    "20": {"apartment": 740,  "house": 520},
+    "21": {"apartment": 600,  "house": 420},
+    "22": {"apartment": 700,  "house": 490},
+    "23": {"apartment": 640,  "house": 460},
+    "24": {"apartment": 740,  "house": 530},
+    "25": {"apartment": 600,  "house": 430}
+  },
+  "cities": {
+    "1":   {"apartment": 1800, "house": 1200},
+    "9":   {"apartment": 780,  "house": 550},
+    "12":  {"apartment": 980,  "house": 680},
+    "14":  {"apartment": 1180, "house": 820},
+    "147": {"apartment": 710,  "house": 500},
+    "184": {"apartment": 660,  "house": 470},
+    "540": {"apartment": 730,  "house": 520}
+  },
+  "rooms_multiplier": {
+    "1": 1.10,
+    "2": 1.00,
+    "3": 0.95,
+    "4": 0.92,
+    "5": 0.90
+  }
+}
